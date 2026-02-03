@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mess Management & Meal Accounts</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        .container { background: #fff; padding: 25px; max-width: 1200px; margin: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        /* Fixed PDF Issue: No Page Break & Background fix */
+        #pdfArea { padding: 15px; background: white; width: 100%; box-sizing: border-box; }
+        
+        .fixed-cost-section { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; background: #e8f4fd; padding: 20px; border-radius: 8px; border-left: 5px solid #1a73e8; }
+        .input-group { flex: 1; min-width: 140px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #333; }
+        input[type="number"], input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        .summary-box { flex-basis: 100%; display: flex; justify-content: space-between; margin-top: 15px; padding-top: 10px; border-top: 1px solid #cfe2f3; }
+        .summary-box b { color: #1a73e8; font-size: 16px; }
+
+        h2 { text-align: center; color: #2c3e50; margin: 0; padding-bottom: 10px; }
+        .info-header { text-align: center; margin-bottom: 20px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 5px; text-align: center; font-size: 12px; }
+        th { background: #1abc9c; color: white; text-transform: uppercase; }
+        
+        .meal-input { width: 50px !important; text-align: center; border: 1px solid #ccc; border-radius: 3px; }
+        .editable-cell { width: 80px !important; background: #fffdf0; border: 1px dashed #bbb !important; text-align: center; font-weight: bold; border-radius: 3px; }
+
+        .custom-section { margin-top: 30px; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #ddd; }
+        .custom-section h4 { margin: 0 0 10px 0; color: #2980b9; text-transform: uppercase; font-size: 14px; }
+        .custom-table th { background: #34495e; }
+
+        .btn-group { text-align: center; margin-top: 20px; padding-bottom: 40px; }
+        .btn { padding: 10px 18px; border: none; background: #1abc9c; color: #fff; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; margin: 5px; font-size: 12px; }
+        .btn:hover { background: #16a085; }
+        .btn-remove { background: #e74c3c; }
+        .btn-pdf { background: #34495e; }
+
+        .footer { text-align: center; margin-top: 25px; font-size: 11px; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
+        
+        /* Forces PDF to not break inside tables */
+        tr, td, th { page-break-inside: avoid !important; }
+    </style>
+</head>
+<body>
+
+<div id="pdfArea">
+    <div class="container">
+        <h2>Monthly Mess Accounts</h2>
+        
+        <div class="info-header">
+            <div><b>Month:</b> <input type="text" id="month" placeholder="Enter Month" style="width:150px; border:none; border-bottom:1px solid #ccc; text-align:center;"></div>
+            <div><b>Auto Meal Rate:</b> <b id="mealRateDisplay">0.00</b> TK</div>
+        </div>
+        
+        <div class="fixed-cost-section">
+            <div class="input-group"><label>House Rent</label><input type="number" id="rent" oninput="calculateFixed()"></div>
+            <div class="input-group"><label>Current Bill</label><input type="number" id="current" oninput="calculateFixed()"></div>
+            <div class="input-group"><label>Waste Bill</label><input type="number" id="waste" oninput="calculateFixed()"></div>
+            <div class="input-group"><label>Cook Bill</label><input type="number" id="cook" oninput="calculateFixed()"></div>
+            <div class="input-group"><label>Others/Demarage</label><input type="number" id="others" oninput="calculateFixed()"></div>
+            <div class="summary-box">
+                <span>Total Fixed Cost: <b id="displayTotalFixed">0</b> TK</span>
+                <span>Cost Per Member: <b id="displayPerMember">0</b> TK</span>
+            </div>
+        </div>
+
+        <table id="mealTable">
+            <thead>
+                <tr>
+                    <th>Sl</th>
+                    <th>Name</th>
+                    <th>Meal</th>
+                    <th>Rate</th>
+                    <th>Meal Cost</th>
+                    <th>Fixed</th>
+                    <th>Total</th>
+                    <th>Deposit</th>
+                    <th>Due</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+                <tr style="background: #e0f2f1; font-weight: bold;">
+                    <td colspan="2">Main Total</td>
+                    <td id="sumMeal">0</td>
+                    <td>—</td>
+                    <td id="sumMealCost">0</td>
+                    <td id="sumFixed">0</td>
+                    <td id="sumTotal">0</td>
+                    <td id="sumDeposit">0</td>
+                    <td id="sumDue">0</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <div class="custom-section">
+            <h4>Manual Additional Calculation</h4>
+            <table id="customTable">
+                <thead>
+                    <tr>
+                        <th>Sl</th>
+                        <th>Name</th>
+                        <th>Meal</th>
+                        <th>Rate</th>
+                        <th>Meal Cost</th>
+                        <th>Fixed</th>
+                        <th>Total</th>
+                        <th>Deposit</th>
+                        <th>Due</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <div style="margin-top: 10px;" class="no-pdf">
+                <button class="btn" style="background:#8e44ad; padding:5px 12px;" onclick="addManualRow()">+ Add Manual Row</button>
+                <button class="btn btn-remove" style="padding:5px 12px;" onclick="removeManualRow()">- Remove Row</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            © Developed by <a href="https://www.facebook.com/salimsadmanshoron" target="_blank">SALIM SADMAN SHORON</a>
+        </div>
+    </div>
+</div>
+
+<div class="btn-group">
+    <button class="btn" onclick="addRow()">Add Main Member</button>
+    <button class="btn btn-remove" onclick="removeLastRow()">Remove Main Member</button>
+    <button class="btn btn-pdf" onclick="downloadPDF()">Download PDF Report</button>
+</div>
+
+<script>
+const tbody = document.querySelector("#mealTable tbody");
+const customTbody = document.querySelector("#customTable tbody");
+let perMemberCost = 0, currentMealRate = 0;
+
+function calculateFixed() {
+    const rent = parseFloat(document.getElementById('rent').value) || 0;
+    const current = parseFloat(document.getElementById('current').value) || 0;
+    const waste = parseFloat(document.getElementById('waste').value) || 0;
+    const cook = parseFloat(document.getElementById('cook').value) || 0;
+    const others = parseFloat(document.getElementById('others').value) || 0;
+    const totalFixed = rent + current + waste + cook + others;
+    const memberCount = tbody.rows.length;
+    document.getElementById('displayTotalFixed').innerText = totalFixed.toFixed(2);
+    if(memberCount > 0) {
+        perMemberCost = totalFixed / memberCount;
+        document.getElementById('displayPerMember').innerText = perMemberCost.toFixed(2);
+        Array.from(tbody.rows).forEach(row => {
+            row.cells[5].querySelector('input').value = perMemberCost.toFixed(2);
+            refreshRowCalculations(row);
+        });
+    }
+    updateFooter();
+}
+
+function addRow(){
+    let sl = tbody.rows.length + 1, row = tbody.insertRow();
+    row.innerHTML = `
+        <td>${sl}</td>
+        <td><input type="text" placeholder="Name" style="width:100px"></td>
+        <td><input type="number" class="meal-input" oninput="globalRecalc()"></td>
+        <td><input type="number" class="editable-cell" oninput="manualRowCalc(this)"></td>
+        <td><input type="number" class="editable-cell"></td>
+        <td><input type="number" class="editable-cell" oninput="manualRowCalc(this)"></td>
+        <td><input type="number" class="editable-cell"></td>
+        <td><input type="number" class="editable-cell" oninput="manualRowCalc(this)"></td>
+        <td><input type="number" class="editable-cell"></td>
+    `;
+    calculateFixed();
+}
+
+function removeLastRow() { if (tbody.rows.length > 0) { tbody.deleteRow(-1); calculateFixed(); globalRecalc(); } }
+
+function globalRecalc() {
+    let tM = 0, tD = 0;
+    Array.from(tbody.rows).forEach(r => {
+        tM += Number(r.cells[2].querySelector('input').value || 0);
+        tD += Number(r.cells[7].querySelector('input').value || 0);
+    });
+    currentMealRate = (tM > 0) ? (tD / tM) : 0;
+    document.getElementById('mealRateDisplay').innerText = currentMealRate.toFixed(2);
+    Array.from(tbody.rows).forEach(r => refreshRowCalculations(r));
+    updateFooter();
+}
+
+function refreshRowCalculations(row) {
+    const m = Number(row.cells[2].querySelector('input').value || 0);
+    const f = Number(row.cells[5].querySelector('input').value || 0);
+    const d = Number(row.cells[7].querySelector('input').value || 0);
+    const mc = m * currentMealRate, t = mc + f, du = t - d;
+    row.cells[3].querySelector('input').value = currentMealRate.toFixed(2);
+    row.cells[4].querySelector('input').value = mc.toFixed(2);
+    row.cells[6].querySelector('input').value = t.toFixed(2);
+    row.cells[8].querySelector('input').value = du.toFixed(2);
+}
+
+function manualRowCalc(el) {
+    const row = el.closest("tr");
+    const m = Number(row.cells[2].querySelector('input').value || 0);
+    const r = Number(row.cells[3].querySelector('input').value || 0);
+    const f = Number(row.cells[5].querySelector('input').value || 0);
+    const d = Number(row.cells[7].querySelector('input').value || 0);
+    const mc = m * r, t = mc + f, du = t - d;
+    row.cells[4].querySelector('input').value = mc.toFixed(2);
+    row.cells[6].querySelector('input').value = t.toFixed(2);
+    row.cells[8].querySelector('input').value = du.toFixed(2);
+    updateFooter();
+}
+
+function updateFooter(){
+    let sM=0, sMC=0, sF=0, sT=0, sDep=0, sDue=0;
+    Array.from(tbody.rows).forEach(r=>{
+        sM += Number(r.cells[2].querySelector('input').value || 0);
+        sMC += Number(r.cells[4].querySelector('input').value || 0);
+        sF += Number(r.cells[5].querySelector('input').value || 0);
+        sT += Number(r.cells[6].querySelector('input').value || 0);
+        sDep += Number(r.cells[7].querySelector('input').value || 0);
+        sDue += Number(r.cells[8].querySelector('input').value || 0);
+    });
+    document.getElementById("sumMeal").innerText = sM;
+    document.getElementById("sumMealCost").innerText = sMC.toFixed(2);
+    document.getElementById("sumFixed").innerText = sF.toFixed(2);
+    document.getElementById("sumTotal").innerText = sT.toFixed(2);
+    document.getElementById("sumDeposit").innerText = sDep.toFixed(2);
+    document.getElementById("sumDue").innerText = sDue.toFixed(2);
+}
+
+function addManualRow() {
+    let sl = customTbody.rows.length + 1, row = customTbody.insertRow();
+    row.innerHTML = `<td>${sl}</td><td><input type="text" style="width:100px"></td><td><input type="number" class="meal-input" oninput="manualRowCalc(this)"></td><td><input type="number" class="editable-cell" oninput="manualRowCalc(this)"></td><td><input type="number" class="editable-cell"></td><td><input type="number" class="editable-cell" oninput="manualRowCalc(this)"></td><td><input type="number" class="editable-cell"></td><td><input type="number" class="editable-cell" oninput="manualRowCalc(this)"></td><td><input type="number" class="editable-cell"></td>`;
+}
+function removeManualRow() { if (customTbody.rows.length > 0) customTbody.deleteRow(-1); }
+
+for(let i=0; i<10; i++) addRow();
+
+function downloadPDF(){
+    const element = document.getElementById("pdfArea");
+    const opt = {
+        margin: [10, 5, 10, 5],
+        filename: 'Mess_Report.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+</script>
+
+</body>
+</html>
